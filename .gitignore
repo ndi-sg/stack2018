@@ -1,0 +1,6 @@
+logs/
+node_modules/
+.eslintrc.js
+*.stat
+*.log
+.DS_Store
