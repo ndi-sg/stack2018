@@ -10,7 +10,6 @@
     "express": "^4.16.3",
     "jsonwebtoken": "^8.3.0",
     "lokijs": "^1.5.5",
-    "mongoose": "^5.2.14",
     "morgan": "^1.9.1"
   }
 }
