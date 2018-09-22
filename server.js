@@ -63,7 +63,7 @@ app.post('/sign-in', function(req, res) {
                 } else {
                   // if everything is good, save to request for use in other routes
                   req.decoded = decoded;
-                  res.redirect('/api/admin?token='+response.data.token);
+                  res.redirect('/api/admin-dashboard?token='+response.data.token);
                 }
             });
         })
@@ -152,7 +152,7 @@ apiRoutes.use(function(req, res, next) {
     }
   });
 
-apiRoutes.get('/dashboard', function(req, res) {
+apiRoutes.get('/admin-dashboard', function(req, res) {
     res.sendFile(path + "dashboard.html");
 });
 
