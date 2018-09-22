@@ -63,11 +63,7 @@ app.post('/sign-in', function(req, res) {
                 } else {
                   // if everything is good, save to request for use in other routes
                   req.decoded = decoded;
-                  if(decoded.admin=="true") {
-                      res.redirect('/api/admin?token='+response.data.token);
-                  }else{
-                      res.redirect('/api/orders?token='+response.data.token);
-                  }
+                  res.redirect('/api/admin?token='+response.data.token);
                 }
             });
         })
@@ -158,15 +154,6 @@ apiRoutes.use(function(req, res, next) {
 
 apiRoutes.get('/dashboard', function(req, res) {
     res.sendFile(path + "dashboard.html");
-});
-
-apiRoutes.get('/admin', function(req, res) {
-    if(req.decoded.admin == "true")
-        res.redirect(path + "dashboard.html");
-    return res.status(403).send({ 
-        success: false, 
-        message: 'You do not have the priviledge to access!' 
-    });
 });
 
 apiRoutes.get('/orders', function(req, res) {
