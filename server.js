@@ -6,6 +6,7 @@ var bodyParser  = require('body-parser');
 var morgan      = require('morgan');
 var jwt         = require('jsonwebtoken'); // used to create, sign, and verify tokens
 var loki        = require('lokijs');
+var axios        = require('axios');
 
 var config      = require('./config'); // get our config file
 var app         = express();
@@ -15,11 +16,12 @@ var app         = express();
 // in-memory db =========
 // =======================
 var db = new loki('db.json');
-var users = db.addCollection('users');
-var results = users.insert([
+var userRecords = [
     { name: 'Thor', password: 'password', admin: 'true'}, 
-    { name: 'Loki', password: 'password', admin: 'true'}
-]);
+    { name: 'Loki', password: 'password', admin: 'false'}
+];
+var users = db.addCollection('users');
+var results = users.insert(userRecords);
 
 
 // =======================
@@ -44,16 +46,37 @@ app.use(morgan('dev'));
 app.get('/', function(req, res) {
     // res.send(`Hello! The API is at http://localhost:${port}/api`);
     res.sendFile(path + "index.html");
+});
 
+app.get('/sign-in', function(req, res) {
+    res.sendFile(path + "sign-in.html");
+});
+
+app.post('/sign-in', function(req, res) {
+    let baseURL = 'http://localhost:' + port;
+    axios.post(baseURL + '/api/authenticate', req.body)
+        .then(function (response) {
+            console.log(response.data);
+            jwt.verify(response.data.token, app.get('superSecret'), function(err, decoded) {      
+                if (err) {
+                  return res.json({ success: false, message: 'Failed to authenticate token.' });    
+                } else {
+                  // if everything is good, save to request for use in other routes
+                  req.decoded = decoded;
+                  res.redirect('/api/admin-dashboard?token='+response.data.token);
+                }
+            });
+        })
+        .catch(function (error) {
+            console.log(`ERROR occured during sign-in >>>`);
+            console.log(error);
+            res.json(error);
+        });  
 });
 
 app.get('/setup', function(req, res) {
-
-    // create a sample user
-    var results = users.insert([
-        { name: 'Thor', password: 'password', admin: 'true'}, 
-        { name: 'Loki', password: 'password', admin: 'true'}
-    ]);
+    // create sample users
+    var results = users.insert(userRecords);
     if (results) {
       console.log('User saved successfully ' + results);
       res.json({ success: true });
@@ -85,7 +108,7 @@ apiRoutes.post('/authenticate', function(req, res) {
                 admin: user.admin
             };
             var token = jwt.sign(payload, app.get('superSecret'), {
-                expiresIn: "1h" // 24 hours
+                expiresIn: "2h" // 24 hours
             });
             res.json({
                 success: true,
@@ -111,6 +134,7 @@ apiRoutes.use(function(req, res, next) {
           return res.json({ success: false, message: 'Failed to authenticate token.' });    
         } else {
           // if everything is good, save to request for use in other routes
+          console.log(decoded);
           req.decoded = decoded;    
           next();
         }
@@ -128,9 +152,8 @@ apiRoutes.use(function(req, res, next) {
     }
   });
 
-apiRoutes.get('/dashboard', function(req, res) {
+apiRoutes.get('/admin-dashboard', function(req, res) {
     res.sendFile(path + "dashboard.html");
-
 });
 
 apiRoutes.get('/orders', function(req, res) {
