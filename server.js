@@ -1,12 +1,14 @@
 // =======================
 // get the packages we need ============
 // =======================
-var express     = require('express');
-var bodyParser  = require('body-parser');
-var morgan      = require('morgan');
 var jwt         = require('jsonwebtoken'); // used to create, sign, and verify tokens
 var loki        = require('lokijs');
-var axios        = require('axios');
+var rand        = require('randomstring');
+var https       = require('https');
+var axios       = require('axios');
+var morgan      = require('morgan');
+var express     = require('express');
+var bodyParser  = require('body-parser');
 
 var config      = require('./config'); // get our config file
 var app         = express();
