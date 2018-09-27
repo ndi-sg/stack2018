@@ -1,12 +1,14 @@
 // =======================
 // get the packages we need ============
 // =======================
-var express     = require('express');
-var bodyParser  = require('body-parser');
-var morgan      = require('morgan');
 var jwt         = require('jsonwebtoken'); // used to create, sign, and verify tokens
 var loki        = require('lokijs');
-var axios        = require('axios');
+var rand        = require('randomstring');
+var https       = require('https');
+var axios       = require('axios');
+var morgan      = require('morgan');
+var express     = require('express');
+var bodyParser  = require('body-parser');
 
 var config      = require('./config'); // get our config file
 var app         = express();
@@ -52,6 +54,7 @@ app.get('/sign-in', function(req, res) {
     res.sendFile(path + "sign-in.html");
 });
 
+// route to authenticate a user and obtain a valid token
 app.post('/sign-in', function(req, res) {
     let baseURL = 'http://localhost:' + port;
     axios.post(baseURL + '/api/authenticate', req.body)
@@ -94,6 +97,46 @@ app.get('/setup/users', function(req, res) {
 // we'll get to these in a second
 // get an instance of the router for api routes
 var apiRoutes = express.Router(); 
+
+apiRoutes.post('/qr-code', function(req, res) {
+    let state = rand.generate({ length: 8, charset: 'alphanumeric'});
+    let nonce = require('uuid/v1')();
+    let client = {
+        id: app.get(config.ndi_client_id),
+        secret: app.get(config.ndi_client_secret)
+    };
+
+    console.log('getQrCode: ', config.ndi_asp_endpoint);
+    const agent = new https.Agent({  
+        rejectUnauthorized: false
+    });
+    axios.get(config.ndi_asp_endpoint+"/auth", {
+        httpsAgent: agent,
+        params: {
+          client_id: config.ndi_client_id,
+          scope:'openid',
+          response_type:'code',
+          nonce: nonce,
+          state: state,
+          display: 'qrcode'
+        }
+      })
+      .then(function (response) {
+        console.log(response.data);
+        res.json({ qr_code: response.data.qr_code, state: state });
+  //      return callback(null, { qr_code: response.data.qr_code, state: state });
+      })
+      .catch(function (error) {
+        console.log(error);
+        return res.status(500).send({ 
+            success: false, 
+            message: 'Server error.',
+            error: error
+        });
+//        return callback(error);
+      });
+});
+
 
 // route to authenticate a user (POST http://localhost:3000/api/authenticate)
 apiRoutes.post('/authenticate', function(req, res) {
@@ -183,3 +226,35 @@ app.use("*",function(req,res){
 // =======================
 app.listen(port);
 console.log(`service running at http://localhost:${port}`);
+
+// =======================
+// Using NDI APIs ========
+// =======================
+function _getAuthNQrCode(callback) {
+    let state = rand.generate({ length: 8, charset: 'alphanumeric'});
+    let nonce = require('uuid/v1')();
+    let client = {
+        id: app.get(config.ndi_client_id),
+        secret: app.get(config.ndi_client_secret)
+    };
+
+    console.log('getQrCode: ', authUrl);
+    axios.get(app.get(config.ndi_authN_endpoint), {
+        params: {
+          client_id: app.get(config.ndi_client_id),
+          scope:'openid',
+          response_type:'code',
+          nonce: nonce,
+          state: state,
+          display: 'qrcode'
+        }
+      })
+      .then(function (response) {
+        console.log(response);
+        return callback(null, { qr_code: response.data.qr_code, state: state });
+      })
+      .catch(function (error) {
+        console.log(error);
+        return callback(error);
+      });
+}
