@@ -9,20 +9,27 @@
     <title>Signin Template for Bootstrap</title>
 
     <!-- Bootstrap core CSS -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+    <link rel="stylesheet" href="//stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
 
     <!-- Custom styles for this template -->
     <link href="signin.css" rel="stylesheet">
   </head>
 
   <body class="text-center">
-    <!--
-    <form class="form-signin" method="POST" enctype="application/x-www-form-urlencoded" action="/api/authenticate">
-    <form class="form-signin" onsubmit="authenticate(this);return false;">
-    -->
     <form class="form-signin" method="POST" action="/sign-in">
-        <img class="mb-4" src="/img/bootstrap-solid.svg" alt="" width="72" height="72">
-      <h1 class="h3 mb-3 font-weight-normal">Please sign in</h1>
+      <span>Sign in with
+        <a id="ndi-qr" class="btn btn-outline-primary mb-3" data-toggle="collapse" href="#collapseExample" role="button" aria-expanded="false" aria-controls="collapseExample">NDI QR Code</a>
+      </span>
+        <div class="collapse" id="collapseExample">
+          <div class="card" style="text-align:-webkit-center">
+              <img class="card-img-top" src="/img/loading.svg" alt="Loading..." style="width:200px"/>
+              <div class="card-body">
+                <h5 class="card-title">Scan with NDI Demo App</h5>
+              </div>
+            </div>
+        </div>
+      <hr><span class="mb-3 font-weight-normal">OR with us</span>
+      <img class="mb-3" src="/img/bootstrap-solid.svg" alt="" width="56" height="56">
       <label for="name" class="sr-only">Name</label>
       <input type="text" id="name" name="name" class="form-control" placeholder="Username" required autofocus>
       <label for="password" class="sr-only">Password</label>
@@ -36,23 +43,17 @@
       <p class="mt-5 mb-3 text-muted">&copy; 2017-2018</p>
     </form>
   </body>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.min.js"></script>
+  <script src="//code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+  <script src="//stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
   <script>
-    function authenticate(form) {
-      let requestBody = {
-        name: form.name.value,
-        password: form.password.value
-      }
-
-      axios.post('/api/authenticate', requestBody)
-        .then(function (response) {
-            console.log(`Signing Response Received >>>`);
-            console.log(response.data);
-        })
-        .catch(function (error) {
-            console.log(`ERROR occured during Signing Request >>>`);
-            console.log(error)
-        });
-    }
+    $("#ndi-qr").on('click', function(){
+      $.post('/api/qr-code', function(data, status) {
+        qr_code = data.qr_code;
+        console.log(data);
+        if ($('.card img').attr('src') == "/img/loading.svg"){
+            $('.card img').attr('src', "data:image/png;base64,"+data.qr_code);
+        }
+      });
+    });
   </script>
 </html>
