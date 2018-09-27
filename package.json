@@ -11,6 +11,8 @@
     "express": "^4.16.3",
     "jsonwebtoken": "^8.3.0",
     "lokijs": "^1.5.5",
-    "morgan": "^1.9.1"
+    "morgan": "^1.9.1",
+    "randomstring": "^1.1.5",
+    "uuid": "^3.3.2"
   }
 }
