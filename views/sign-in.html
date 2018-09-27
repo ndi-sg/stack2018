@@ -45,6 +45,7 @@
   </body>
   <script src="//code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
   <script src="//stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.min.js"></script>
   <script>
     $("#ndi-qr").on('click', function(){
       $.post('/api/qr-code', function(data, status) {
@@ -55,5 +56,21 @@
         }
       });
     });
+    function authenticate(form) {
+      let requestBody = {
+        name: form.name.value,
+        password: form.password.value
+      }
+
+      axios.post('/api/authenticate', requestBody)
+        .then(function (response) {
+            console.log(`Signing Response Received >>>`);
+            console.log(response.data);
+        })
+        .catch(function (error) {
+            console.log(`ERROR occured during Signing Request >>>`);
+            console.log(error)
+        });
+    }
   </script>
 </html>
