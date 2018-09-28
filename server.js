@@ -1,6 +1,7 @@
 // =======================
 // get the packages we need ============
 // =======================
+var fs          = require('fs');
 var jwt         = require('jsonwebtoken'); // used to create, sign, and verify tokens
 var loki        = require('lokijs');
 var rand        = require('randomstring');
@@ -41,6 +42,18 @@ app.use(bodyParser.json());
 // use morgan to log requests to the console
 app.use(morgan('dev'));
 
+// setup axios for cors
+const agent = new https.Agent({  
+    rejectUnauthorized: false
+});
+const axiosConfig = {
+    httpsAgent: agent,
+    headers: {
+        'Content-Type': 'application/json;charset=UTF-8',
+        "Access-Control-Allow-Origin": "*",
+    }    
+};
+
 // =======================
 // routes ================
 // =======================
@@ -76,6 +89,52 @@ app.post('/sign-in', function(req, res) {
         });  
 });
 
+app.get('/sign-in-ndi', function(req, res) {
+    res.sendFile(path + "sign-in-ndi.html");
+});
+
+// route to NDI direct invocation flow to authenticate user
+app.post('/sign-in-ndi', function(req, res) {
+    let nonce = require('uuid/v1')();
+
+    let baseURL = config.ndi_asp_endpoint;
+    axios.post(baseURL+"/di-auth", {
+          client_id: config.ndi_client_id,
+          client_secret: config.ndi_client_secret,
+          scope: 'openid',
+          acr_values: 'mod-mf',
+          login_hint: req.body.name,
+          binding_message: 'HelloNDI sends an auth request',
+          nonce: nonce
+        }, axiosConfig
+      )
+      .then(function (response) {
+        console.log(response.data);
+        var cert = fs.readFileSync('./ndi-asp-public.pem');
+        jwt.verify(response.data.id_token, cert, function(err, decoded) {      
+            if (err) {
+              return res.json({ success: false, message: 'Failed to authenticate ASP token.' });    
+            } else {
+              // if everything is good, save to request for use in other routes
+              req.decoded = decoded;
+              return res.json({ success: true, message: 'Authenticated by NDI successfully!',
+                response: response.data });    
+            }
+        });
+
+        res.send(response.data);
+      })
+      .catch(function (error) {
+        console.log(error);
+        res.status(500).send({ 
+            success: false, 
+            message: 'Server error.',
+            error: error
+        });
+      });
+});
+
+
 app.get('/setup', function(req, res) {
     // create sample users
     var results = users.insert(userRecords);
@@ -96,6 +155,8 @@ app.get('/setup/users', function(req, res) {
 // we'll get to these in a second
 // get an instance of the router for api routes
 var apiRoutes = express.Router(); 
+
+
 
 // route to authenticate a user (POST http://localhost:3000/api/authenticate)
 apiRoutes.post('/authenticate', function(req, res) {
@@ -131,8 +192,16 @@ apiRoutes.use(function(req, res, next) {
     if (token) {
   
       // verifies secret and checks exp
+      var cert = fs.readFileSync('./ndi-asp-public.pem');
       jwt.verify(token, app.get('superSecret'), function(err, decoded) {      
         if (err) {
+            jwt.verify(token, cert, function(err, decoded) {      
+                if (err) { throw err; }
+                else { 
+                    req.decoded = decoded; 
+                    next();
+                }
+            });
           return res.json({ success: false, message: 'Failed to authenticate token.' });    
         } else {
           // if everything is good, save to request for use in other routes

@@ -16,14 +16,11 @@
   </head>
 
   <body class="text-center">
-      <form class="form-signin" method="POST" action="/sign-in">
-        Sign in with <a class="btn btn-primary mb-2" href="/sign-in-ndi">NDI Direct</a><br/><hr/>
-        Or with us <img class="mb-4" src="/img/bootstrap-solid.svg" alt="" width="72" height="72">
-      <h1 class="h3 mb-3 font-weight-normal">Please sign in</h1>
+    <form class="form-signin" method="POST" action="/sign-in-ndi">
+        <img class="mb-4" src="/img/bootstrap-solid.svg" alt="" width="72" height="72">
+      <h1 class="h3 mb-3 font-weight-normal">Please sign in with NDI</h1>
       <label for="name" class="sr-only">Name</label>
-      <input type="text" id="name" name="name" class="form-control" placeholder="Username" required autofocus>
-      <label for="password" class="sr-only">Password</label>
-      <input type="password" id="password" name="password" class="form-control" placeholder="Password" required>
+      <input type="text" id="name" name="name" class="form-control" placeholder="NDI Id" required autofocus>
       <div class="checkbox mb-3">
         <label>
           <input type="checkbox" value="remember-me"> Remember me
