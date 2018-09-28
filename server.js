@@ -1,6 +1,7 @@
 // =======================
 // get the packages we need ============
 // =======================
+var fs          = require('fs');
 var jwt         = require('jsonwebtoken'); // used to create, sign, and verify tokens
 var loki        = require('lokijs');
 var rand        = require('randomstring');
@@ -24,7 +25,6 @@ var userRecords = [
 ];
 var users = db.addCollection('users');
 var results = users.insert(userRecords);
-
 
 // =======================
 // configuration =========
