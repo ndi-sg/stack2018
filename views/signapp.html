@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Demo-SignApp</title>
+
+    <!-- Bootstrap core CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+
+    <link href="/css/sign.css" rel="stylesheet">
+    <link href="/css/skin-blue.css" rel="stylesheet" id="color_theme">
+    <link href="/css/custom.css" rel="stylesheet">
+
+    <script src="/js/jsrsasign-all-min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.min.js"></script>
+
+    <script language="JavaScript" type="text/javascript">
+
+        var signRequest = {
+            // client_id:"client_id",   // must be populate by server
+            // client_secret:"secret",  // must be populate by server
+            // nonce:"",                // must be populate by server
+            clientData: {},
+            hash_alg:"sha256",          // may be hashed by frontend
+            hash:"",                    // may be hashed by frontend; may be displayed to the user
+            login_hint:"",              // obtained from ndi_id user
+            redirect_uri:"",            
+            scope:"signHash",           
+            response_type:"json",       // default is "json"; alt. pkcs7    
+            tx_id:"",                   
+            tx_expiry:"",
+            tx_doc_name:"",
+            tx_vcode: ""                // must be displayed to the user
+        };
+
+        // signResponse: {
+        //      jws: jws,
+        //      signedData: {} // interim (sandbox only); similiar data are in jws
+        // }
+        // see below for details
+        // jws (you may ignore the signature in sandbox)
+        // jws-payload: {
+        //      iss: "https://sandbox.api.ndi.gov.sg/hss",
+   		//      aud: client_id,
+   		//      iat: iatTime,
+   		//      sub: user.cn,
+   		//      cert_PEM: PEM-base64,
+   		//      txn: {
+   		// 	        tx_id: params.tx_id,
+   		// 	        state: params.state,
+   		// 	        nonce: params.nonce
+   		//      },
+   		//      signData: {
+   		// 	        sign_alg: ec.getName,
+   		// 	        signature: signedHash,
+   		// 	        sign_time: signTime
+        //  }
+        // interim (sandbox only)
+        // signedData: {
+        //    signedHash: signature,
+        //    certPEM: certPEM
+        // }   
+
+        var signResponse = {
+            err: {},
+            res: {}
+        };
+
+    
+    function handleFileSelect(evt) {
+        var f = evt.target.files[0]; // FileList object
+        var reader = new FileReader();
+        // Closure to capture the file information.
+        reader.onload = (function(theFile) {
+            signRequest.doc_name = theFile.name;
+            return function(e) {
+            var binaryData = e.target.result;
+            //Converting Binary Data to base 64
+            var base64String = window.btoa(binaryData);
+            //showing file converted to base64
+            // document.getElementById('base64').value = base64String;
+            signRequest.hash = getHash(signRequest.hash_alg, base64String);
+            console.log(`Get filehash from base64..."${signRequest.hash}"`);
+            document.getElementById('hashLabel').innerHTML = "file";
+            document.getElementById('hash_val').value = signRequest.hash;
+            
+            // alert('File converted to base64 successfuly!\nCheck in Textarea');
+            };
+        })(f);
+        // Read in the image file as a data URL.
+        reader.readAsBinaryString(f);
+
+    }
+
+    function showSignProvider() {
+        document.getElementById('showSignProvider').style.display='block';
+    }
+
+
+    function prepareHash() {
+        let eContent = document.getElementById("eContent"); 
+
+        // if the eContent is a file, filehash will already be populated in signRequest.hash
+        if(signRequest.hash == "") {
+            // if signer is going to sign on a simple message
+            document.getElementById('hashLabel').innerHTML = "message";
+            console.log("hashing {%s} using {%s}", eContent.value, signRequest.hash_alg);
+            toggle_msgOrFile();
+            signRequest.hash = getHash(signRequest.hash_alg, eContent.value);     
+            console.log(`Get msghash..."${signRequest.hash}"`);
+        }
+    }
+
+    function updateSignatureFields(signedData, jws){
+        var f2 = document.formCert;
+        // to replaced signedData with jws
+        // TODO: jws validation
+        
+        // f2.sign_val.value = signedData.signedHash;
+        // f2.certBox.value = signedData.certPEM;
+        // TODO verify signature
+        var sJWT = jws;
+        var headerObj = KJUR.jws.JWS.readSafeJSONString(b64utoutf8(sJWT.split(".")[0]));
+        var payloadObj = KJUR.jws.JWS.readSafeJSONString(b64utoutf8(sJWT.split(".")[1]));
+        f2.sign_val.value = payloadObj.signData.signature;
+        f2.certBox.value = payloadObj.cert_PEM;        
+    }    
+
+    function verifySignature(){
+        let msgHashHex = document.getElementById("hash_val").value;
+        let sigHex = document.getElementById("sign_val").value;
+        let pubCert = document.getElementById("certBox").value;
+        
+        console.log("Reading public certificate received...");
+        let pubKey = KEYUTIL.getKey(pubCert);
+        console.log(pubKey);
+        document.getElementById('curveName').innerText=pubKey.curveName;
+        document.getElementById('sig_alg').value=pubKey.curveName;
+        console.log(`Pubkey Signing Algo: ${pubKey.curveName}`);
+        var ec = new KJUR.crypto.ECDSA({'curve': pubKey.curveName});
+
+        //var pubkeyHex = ec.readCertPubKeyHex(x.hex);
+        // var pubkeyHex = ec.readCertPubKeyHex(pemtohex(pub_cert));
+        
+        console.log(`Verifying hash with: "${pubKey.pubKeyHex}"`);
+        let valid = ec.verifyHex(msgHashHex, sigHex, pubKey.pubKeyHex);
+        console.log(`Verification result: "${valid}"`);
+
+        if(valid) {
+            document.getElementById('bValid').style.display='block';
+            document.getElementById('bInvalid').style.display='none';
+            showCertData();
+        }else{
+            document.getElementById('bValid').style.display='none';
+            document.getElementById('bInvalid').style.display='block';
+        }
+        console.log("Show Parsed Public Certificate");
+        showCertData();
+    }
+
+    function getHash(hashAlg, content) {
+        let md = new KJUR.crypto.MessageDigest({"alg": hashAlg});
+        md.updateString(content);
+        return md.digest();
+    }
+
+    function showCertData(){
+        var f2 = document.formCert;
+        var certPEM = f2.certBox.value;
+        var x = new X509();
+        x.readCertPEM(certPEM);
+        var subjectString = x.getSubjectString();
+
+        var decodedInHTML = "<div class='decodedInfo'>";
+        decodedInHTML += "<strong>Certificate Information:</strong>";
+        decodedInHTML += listItemHtml("SerialNumber:", x.getSerialNumberHex());
+        decodedInHTML += listItemHtml("Issuer:", x.getIssuerString());
+        decodedInHTML += listItemHtml("Validity:","");
+        decodedInHTML += listItemHtml("From:", zulutodate(x.getNotBefore()));
+        decodedInHTML += listItemHtml("To:", zulutodate(x.getNotAfter()));
+        decodedInHTML += listItemHtml("Subject:", subjectString);
+
+        var res = subjectString.split("/");        
+        for (i = 0; i < res.length; i++) {
+            if(res[i]=="") continue;
+            else{
+            var certData = res[i].split("=");
+            switch(certData[0]) {
+                case "C":
+                    str = listItemHtml("Country",certData[1]);
+                    break;
+                case "ST":
+                    str = listItemHtml("State",certData[1]);
+                    break;
+                case "O":
+                    str = listItemHtml("Organization",certData[1]); 
+                    break;
+                case "OU":
+                    str = listItemHtml("OrganizationUnit",certData[1]); 
+                    break;
+                case "CN":
+                    str = listItemHtml("CommonName",certData[1]); 
+                    break;
+                default:
+                    str = listItemHtml(certData[0],certData[1]); 
+            }
+            decodedInHTML += str; 
+            }
+        }
+
+        document.getElementById("certData").innerHTML = decodedInHTML+"</div>";
+        // document.getElementById('certData').style.display='block';
+    }
+
+    function listItemHtml(title, value){
+        return "<h5><b>" + title + ":</b> " + value + "</h5>"
+    }
+
+    function setSignServiceInput(){
+        let sval = document.getElementById("selectSignProvider").value;
+        let input = ""; 
+        switch(sval) {
+                case "ndi-sign":
+                    input = ndiSignInput();
+                    break;
+                default:
+                    input = otherInput();
+        }
+        document.getElementById('signServiceInput').innerHTML = input;
+    }
+
+    function ndiSignInput(){
+        return "<label><b>Enter your NDI Id:</b></label><br>" +                 
+            "<input id='ndi_id' type='text' placeholder='Enter NDI Id' name='ndi_id' required><br/>" +
+            "<div class=\"container\" style=\"background-color:#f1f1f1\">" +
+            "    <button type=\"button\" onclick=\"doNDISign()\">Click to Sign</button>" +
+            "</div>";
+    }
+
+    function otherInput(){
+        return "Service Not Available at the moment!";
+    }
+
+</script>
+</head>
+<body>
+    <div class="outer">
+            <div class="header-2">
+                <div class="container">
+                    <div class="row">
+                        <div class="col-md-6">
+
+
+
+<h2>Demo-SignApp</h2>
+
+<form name="formMessage">
+    <div class="panel panel-blue">
+        <div class="panel-heading">(Step1) Create message content<span id="loading" class="">&nbsp;&nbsp;&nbsp;&nbsp;<!-- spinner --></span></div>
+        <div class="panel-body">
+            Verification Code 
+            <input id="msg_id" type="text" placeholder="verification code" name="msg_id" value="112233" required><br/>
+            <div onclick="toggle_msgOrFile()"><b style="cursor: pointer;">Upload file </b>or <b style="cursor: pointer;">Create message</b> to be signed (i.e. eContent):</div>
+            <input type="file" id="files" name="files" /><br/>
+            <textarea id="eContent" name="eContent" cols="65" rows="2" style="display: none">This is a document</textarea><br>
+            <button type="button" onclick="showSignProvider()">Click to Sign</button>
+        </div>
+    </div>
+    <div class="panel panel-blue">
+        <div class="panel-heading">(Step2) Backend document hashing<span id="loading" class="">&nbsp;&nbsp;&nbsp;&nbsp;<!-- spinner --></span></div>
+        <div class="panel-body">
+                Hash algorithm 
+                <input id="hash_alg" type="text" placeholder="hashing algorithms (RFC5754)" name="hash_alg" value="SHA-256" required><br/>
+                Hash value (of <div id="hashLabel" style="display: inline;">message</div>)
+                <input id="hash_val" type="text" name="hash_val" value="" size="40" readonly/>
+        </div>
+    </div>
+</form>
+<form name="formCert" id="check_form">
+    <div class="panel panel-blue">
+        <div class="panel-heading">(Step3) Accept signing request<span id="loading" class="">&nbsp;&nbsp;&nbsp;&nbsp;<!-- spinner --></span></div>
+        <div class="panel-body">
+            1) You will receive a notification for the signing request
+            (Depending on Google FCM, it might take a while... wait 5 sec)<br/>
+            2) Click on the notification, check the verification code, and ACCEPT to sign.<br/>
+            3) Once the hash is signed, this signature application can get the signed hash and public certificate of the user's certificate.
+        </div>
+    </div>
+    <div class="panel panel-blue">
+        <div class="panel-heading step4">(Step4) Validate Signature<span id="loading" class="">&nbsp;&nbsp;&nbsp;&nbsp;<!-- spinner --></span></div>
+        <div class="panel-body">
+            <button type="button" onclick="verifySignature();document.getElementById('id01').style.display='block';">Verify Signature Value</button>
+
+            <p>If you want to decode certificates on your own computer, run this OpenSSL command:</p>
+            <p><code>openssl x509 -in certificate.crt -text -noout</code></p>
+            <p></p>
+            <div class="panel panel-green">
+                <div class="panel-heading" style="background: #30c247">User Cert<span id="loading" class="">&nbsp;&nbsp;&nbsp;&nbsp;<!-- spinner --></span></div>
+                <div class="panel-body">
+                    <textarea id="certBox" class="pemBox" name="cert_text"></textarea>
+                </div>
+            </div>
+            Signature algorithm <input id="sig_alg" type="text" placeholder="signature algorithms (RFC5480)" name="sig_alg" value="" readonly><br/>
+            <p></p>
+            <div class="panel panel-green">
+                <div class="panel-heading" style="background: #30c247">Signature value<span id="loading" class="">&nbsp;&nbsp;&nbsp;&nbsp;<!-- spinner --></span></div>
+                <div class="panel-body">
+                <textarea id="sign_val" class="pemBoxSmall" name="sign_text"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+<!--
+<button onclick="document.getElementById('id01').style.display='block'" style="width:auto;">NDI Login</button>
+-->
+    <div id="id01" class="modal">
+        <form class="modal-content animate">
+            <div class="container">
+            <label><b>Validation Result</b></label><br>
+            CurveName: <div id="curveName"></div>
+            </div>
+            <div class="container" id="certData"></div>
+            <div class="container" style="background-color:#f1f1f1">
+                <button id="bValid" type="button" onclick="document.getElementById('id01').style.display='none'">Valid</button>
+                <button id="bInvalid" type="button" onclick="document.getElementById('id01').style.display='none'" class="cancelbtn">Invalid</button>
+            </div>
+        </form>
+    </div>
+
+    <div id="showSignProvider" class="modal">
+        <form class="modal-content animate">
+            <div class="container">
+                <label><b>Select your signing service:</b></label><br>
+                <select id="selectSignProvider" onchange="setSignServiceInput()">
+                    <option value="ndi-sign">NDI Sign</option>
+                    <option value="anysign">AnySign</option>
+                    <option value="othersign">OtherSign</option>
+                </select>
+            </div>
+            <div class="container" id="signServiceInput">
+                <label><b>Enter your NDI Id:</b></label><br>
+                <input id="ndi_id" type="text" placeholder="Enter NDI Id" name="ndi_id" required><br/>
+                <div class="container" style="background-color:#f1f1f1">
+                        <button type="button" onclick="doNDISign()">Click to Sign</button>
+                    </div>
+                </div>
+        </form>
+    </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+<script>
+
+    // Get the modal
+    var modal = document.getElementById('id01');
+    var modal2 = document.getElementById('showSignProvider');
+
+    // When the user clicks anywhere outside of the modal, close it
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
+        if (event.target == modal2) {
+            modal2.style.display = "none";
+        }
+    }
+
+    function toggle_msgOrFile() {
+       var m = document.getElementById('eContent');
+       var f = document.getElementById('files');
+
+       if(m.style.display == 'block'){
+            m.style.display = 'none';
+            f.style.display = 'block';
+       }
+       else{
+            m.style.display = 'block';
+            f.style.display = 'none';
+       }
+    }
+
+    function scrollToClass(tag) {
+        // location.hash = "#" + hash;
+    document.querySelector('.'+tag).scrollIntoView({ 
+        behavior: 'smooth' 
+    });
+    }
+
+    if (window.File && window.FileReader && window.FileList && window.Blob) {
+        document.getElementById('files').addEventListener('change', handleFileSelect, false);
+    } else {
+        alert('The File APIs are not fully supported in this browser.');
+    }
+
+    window.addEventListener('unhandledrejection', event => {
+        // Can prevent error output on the console:
+        event.preventDefault();
+
+        // Send error to log server
+        log('Reason: ' + event.reason);
+    });
+
+    function doNDISign() {
+        let ndi_id = document.getElementById("ndi_id");
+        let msg_id = document.getElementById("msg_id");
+        let hash_val = document.getElementById("hash_val");
+        let eContent = document.getElementById("eContent"); 
+        let sign_val = document.getElementById("sign_val"); 
+        let signapp_backend_url = '/sign-with-ndi';
+
+        sign_val.value = "signing ...";
+
+        if(ndi_id.value=="") {
+            alert("Please enter your NDI ID");
+            return;
+        }else{
+            document.getElementById('showSignProvider').style.display='none';
+        }
+        signRequest.ndi_id = ndi_id.value; // to be replaced by login_hint
+        signRequest.login_hint = ndi_id.value;
+        signRequest.clientData.vcode = msg_id.value; // to be replaced by tx_vcode
+        signRequest.tx_vcode = msg_id.value;
+        // console.log(`request access token from "${ndiAuthZUrl}"`);
+        // TODO: Get client credential grant from demoas
+        console.log(`request signing for: "${signRequest.ndi_id}" using vcode: "${signRequest.clientData.vcode}"`);
+        
+        console.log("checking for hash...");
+        prepareHash();
+        // initialize
+        // TODO: In async mode, hashing can be done after NDI ID is verified
+        hash_val.value = signRequest.hash;
+
+        console.log(signRequest);
+
+        axios.post(signapp_backend_url, signRequest)
+            .then(function (response) {
+                console.log("Signing Response Received >>>"+response);
+                this.signResponse.res = response.data;
+                let cval = confirm('Signing Response Received!');
+                if(cval) {
+                    scrollToClass('step4');
+                }
+                updateSignatureFields(response.data.signedData, response.data.jws);
+            })
+            .catch(function (error) {
+                console.log("ERROR occured during Signing Request >>>"+ error);
+                this.signResponse.err = error;
+                window.alert('ERROR occured during Signing Request');
+            });
+    }
+
+</script>
+</body>
+</html>

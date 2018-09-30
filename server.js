@@ -83,6 +83,14 @@ app.get('/sign-in', function(req, res) {
     res.sendFile(path + "sign-in.html");
 });
 
+app.get('/doc', function(req, res) {
+    res.sendFile(path + "doc.html");
+});
+
+app.get('/signapp', function(req, res) {
+    res.sendFile(path + "signapp.html");
+});
+
 app.post('/sign-in', function(req, res) {
     let baseURL = 'http://localhost:' + port;
     axios.post(baseURL + '/api/authenticate', req.body)
@@ -103,6 +111,50 @@ app.post('/sign-in', function(req, res) {
             console.log(error);
             res.json(error);
         });  
+});
+
+// route to NDI direct invocation flow to authenticate user
+app.post('/sign-with-ndi', function(req, res) {
+    let signRequest = {
+        client_id: config.client_id,
+        client_secret: config.client_secret,
+        hash_alg: 'sha256',
+        hash:'',
+        login_hint: req.body.name,
+        scope: 'signHash',
+        response_type: 'json',
+        tx_id: 'txid',
+        tx_state: '',
+        tx_expiry: '',
+        tx_vcode: '',
+        prompt: 'none', 
+        nonce: uuidv1()
+    };
+    axios.post(config.ndi_hss_endpoint+"/signatures/signHash", signRequest, axiosConfig)
+      .then(function (response) {
+        console.log(response.data);
+        var cert = fs.readFileSync('./ndi-asp-public.pem');
+        jwt.verify(response.data.jws, cert, function(err, decoded) {      
+            if (err) {
+              return res.json({ success: false, message: 'Failed to authenticate ASP token.' });    
+            } else {
+              // if everything is good, save to request for use in other routes
+              req.decoded = decoded;
+              return res.json({ success: true, message: 'Authenticated by NDI successfully!',
+                response: response.data });    
+            }
+        });
+
+        res.send(response.data);
+      })
+      .catch(function (error) {
+        console.log(error);
+        res.status(500).send({ 
+            success: false, 
+            message: 'Server error.',
+            error: error
+        });
+      });
 });
 
 // API ROUTES -------------------
