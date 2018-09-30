@@ -7,13 +7,13 @@ var loki        = require('lokijs');
 var rand        = require('randomstring');
 var https       = require('https');
 var axios       = require('axios');
+var uuidv1      = require('uuid/v1');
 var morgan      = require('morgan');
 var express     = require('express');
 var bodyParser  = require('body-parser');
 
 var config      = require('./config'); // get our config file
 var app         = express();
-
 
 // =======================
 // in-memory db =========
@@ -82,6 +82,10 @@ app.get('/sign-in', function(req, res) {
     res.sendFile(path + "sign-in.html");
 });
 
+app.get('/sign-in-ndi', function(req, res) {
+    res.sendFile(path + "sign-in-ndi.html");
+});
+
 app.post('/sign-in', function(req, res) {
     let baseURL = 'http://localhost:' + port;
     axios.post(baseURL + '/api/authenticate', req.body)
@@ -103,6 +107,90 @@ app.post('/sign-in', function(req, res) {
             res.json(error);
         });  
 });
+
+app.post('/sign-in-ndi', function(req, res) {
+    let notifToken = rand.generate({ length: 16, charset: 'alphanumeric'});
+
+    let authRequest = {
+        client_id : config.ndi_client_id,
+        client_secret : config.ndi_client_secret,
+        scope: 'openid',
+        client_notification_token: notifToken,
+        acr_values: 'mod-mf',
+        login_hint: req.body.name,
+        binding_message: 'HelloNDI sends an auth request',
+        redirect_uri : '',
+        nonce: uuidv1()
+    };
+
+    axios.post(config.ndi_asp_endpoint + '/di-auth', authRequest, axiosConfig)
+        .then(function (response) {
+            console.log(response.data);
+            // obtain request attributes for polling
+            authRequest.auth_req_id = response.data.auth_req_id;
+            authRequest.expires_in = response.data.expires_in;
+
+            let authStatusRequest = { 
+                client_id : config.ndi_client_id, 
+                client_secret : config.ndi_client_secret,
+                auth_req_id: response.data.auth_req_id,
+                grant_type: 'direct_invocation_request'
+            };
+         
+            // poller(url, data, interval, timeout, retries)
+            poller(config.ndi_asp_endpoint + '/token', authStatusRequest, 1000, 15 * 1000)
+                .then(function(status){  
+                 console.log("Polling ended");
+                 console.log(status);
+                 res.json({success: true, message: 'Authenticated by NDI', status: status});
+             })
+             .catch(function(err){
+                 console.log(err);
+                 res.json({success: false, message: 'Unable to obtain auth-status with NDI', error: err.message});
+             });
+        })
+        .catch(function (error) {
+            console.log(`ERROR occured during sign-in >>>`);
+            console.log(error);
+            res.json({success: false, message: 'Unable to authenticate with NDI', error: error.data});
+        });  
+});
+
+function delay(t) {
+    return new Promise(function(resolve) {
+        setTimeout(resolve, t);
+    });
+}
+
+function poller(url, data, interval, timeout) {
+    let start = Date.now();
+    function run() {
+        return axios.post(url, data, axiosConfig)
+        .then(function(response){
+                return response.data;
+        })
+        .catch(function(error){
+            // when error is not "authorization_pending", stop polling
+            if(error.response && error.response.status === 400 && error.response.data) {
+                if (!error.response.data.error.includes("authorization_pending")) {
+                    throw error; // stop polling due to unexpected error
+                } else {
+                    console.log(error.response.data);
+                    if (timeout !== 0 && Date.now() - start > timeout) {
+                        throw new Error("polling ended due to timeout");
+                    } else {
+                        // run again with a short delay
+                        return delay(interval).then(run);
+                    }
+                }
+            } else {
+                console.log(error);
+                throw error;
+            }
+        });
+    }
+    return run();
+}
 
 // API ROUTES -------------------
 // we'll get to these in a second
