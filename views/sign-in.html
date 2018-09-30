@@ -54,23 +54,13 @@
         if ($('.card img').attr('src') == "/img/loading.svg"){
             $('.card img').attr('src', "data:image/png;base64,"+data.qr_code);
         }
+        $('form').attr('action', '/sign-in-ndi');
+        $('<input />').attr('type', 'hidden')
+          .attr('name', "auth_req_id")
+          .attr('value', data.auth_req_id)
+          .appendTo('form');
+        $('form').submit();
       });
     });
-    function authenticate(form) {
-      let requestBody = {
-        name: form.name.value,
-        password: form.password.value
-      }
-
-      axios.post('/api/authenticate', requestBody)
-        .then(function (response) {
-            console.log(`Signing Response Received >>>`);
-            console.log(response.data);
-        })
-        .catch(function (error) {
-            console.log(`ERROR occured during Signing Request >>>`);
-            console.log(error)
-        });
-    }
   </script>
 </html>
