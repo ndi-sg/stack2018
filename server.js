@@ -8,12 +8,12 @@ var rand        = require('randomstring');
 var https       = require('https');
 var axios       = require('axios');
 var morgan      = require('morgan');
+var uuidv1      = require('uuid/v1');
 var express     = require('express');
 var bodyParser  = require('body-parser');
 
 var config      = require('./config'); // get our config file
 var app         = express();
-
 
 // =======================
 // in-memory db =========
@@ -25,7 +25,6 @@ var userRecords = [
 ];
 var users = db.addCollection('users');
 var results = users.insert(userRecords);
-
 
 // =======================
 // configuration =========
@@ -61,6 +60,22 @@ const axiosConfig = {
 app.get('/', function(req, res) {
     // res.send(`Hello! The API is at http://localhost:${port}/api`);
     res.sendFile(path + "index.html");
+});
+
+app.get('/setup', function(req, res) {
+    // create sample users
+    var results = users.insert(userRecords);
+    if (results) {
+      console.log('User saved successfully ' + results);
+      res.json({ success: true });
+    } else {
+        throw new Error("cannot insert into db");
+    }
+});
+
+app.get('/setup/users', function(req, res) {
+    var results = users.find({});
+    res.json(results);
 });
 
 app.get('/sign-in', function(req, res) {
@@ -135,28 +150,10 @@ app.post('/sign-in-ndi', function(req, res) {
 });
 
 
-app.get('/setup', function(req, res) {
-    // create sample users
-    var results = users.insert(userRecords);
-    if (results) {
-      console.log('User saved successfully ' + results);
-      res.json({ success: true });
-    } else {
-        throw new Error("cannot insert into db");
-    }
-});
-
-app.get('/setup/users', function(req, res) {
-    var results = users.find({});
-    res.json(results);
-});
-
 // API ROUTES -------------------
 // we'll get to these in a second
 // get an instance of the router for api routes
 var apiRoutes = express.Router(); 
-
-
 
 // route to authenticate a user (POST http://localhost:3000/api/authenticate)
 apiRoutes.post('/authenticate', function(req, res) {
