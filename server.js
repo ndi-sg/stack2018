@@ -1,12 +1,14 @@
 // =======================
 // get the packages we need ============
 // =======================
+var fs          = require('fs');
 var jwt         = require('jsonwebtoken'); // used to create, sign, and verify tokens
 var loki        = require('lokijs');
 var rand        = require('randomstring');
 var https       = require('https');
 var axios       = require('axios');
 var morgan      = require('morgan');
+var uuidv1      = require('uuid/v1');
 var express     = require('express');
 var bodyParser  = require('body-parser');
 
@@ -25,7 +27,6 @@ var userRecords = [
 var users = db.addCollection('users');
 var results = users.insert(userRecords);
 
-
 // =======================
 // configuration =========
 // =======================
@@ -41,6 +42,18 @@ app.use(bodyParser.json());
 // use morgan to log requests to the console
 app.use(morgan('dev'));
 
+// setup axios for cors
+const agent = new https.Agent({  
+    rejectUnauthorized: false
+});
+const axiosConfig = {
+    httpsAgent: agent,
+    headers: {
+        'Content-Type': 'application/json;charset=UTF-8',
+        "Access-Control-Allow-Origin": "*",
+    }    
+};
+
 // =======================
 // routes ================
 // =======================
@@ -48,6 +61,22 @@ app.use(morgan('dev'));
 app.get('/', function(req, res) {
     // res.send(`Hello! The API is at http://localhost:${port}/api`);
     res.sendFile(path + "index.html");
+});
+
+app.get('/setup', function(req, res) {
+    // create sample users
+    var results = users.insert(userRecords);
+    if (results) {
+      console.log('User saved successfully ' + results);
+      res.json({ success: true });
+    } else {
+        throw new Error("cannot insert into db");
+    }
+});
+
+app.get('/setup/users', function(req, res) {
+    var results = users.find({});
+    res.json(results);
 });
 
 app.get('/sign-in', function(req, res) {
@@ -75,22 +104,6 @@ app.post('/sign-in', function(req, res) {
             console.log(error);
             res.json(error);
         });  
-});
-
-app.get('/setup', function(req, res) {
-    // create sample users
-    var results = users.insert(userRecords);
-    if (results) {
-      console.log('User saved successfully ' + results);
-      res.json({ success: true });
-    } else {
-        throw new Error("cannot insert into db");
-    }
-});
-
-app.get('/setup/users', function(req, res) {
-    var results = users.find({});
-    res.json(results);
 });
 
 // API ROUTES -------------------
