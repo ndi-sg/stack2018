@@ -49,7 +49,6 @@
   <script>
     $("#ndi-qr").on('click', function(){
       $.post('/qr-code-ndi', function(data, status) {
-        qr_code = data.qr_code;
         console.log(data);
         if ($('.card img').attr('src') == "/img/loading.svg"){
             $('.card img').attr('src', "data:image/png;base64,"+data.qr_code);
