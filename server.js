@@ -110,8 +110,6 @@ app.get('/sign-in-ndi', function(req, res) {
 
 // route to NDI direct invocation flow to authenticate user
 app.post('/sign-in-ndi', function(req, res) {
-    let nonce = require('uuid/v1')();
-
     let baseURL = config.ndi_asp_endpoint;
     axios.post(baseURL+"/di-auth", {
           client_id: config.ndi_client_id,
@@ -120,7 +118,7 @@ app.post('/sign-in-ndi', function(req, res) {
           acr_values: 'mod-mf',
           login_hint: req.body.name,
           binding_message: 'HelloNDI sends an auth request',
-          nonce: nonce
+          nonce: uuidv1()
         }, axiosConfig
       )
       .then(function (response) {
@@ -136,8 +134,6 @@ app.post('/sign-in-ndi', function(req, res) {
                 response: response.data });    
             }
         });
-
-        res.send(response.data);
       })
       .catch(function (error) {
         console.log(error);
@@ -187,9 +183,7 @@ apiRoutes.use(function(req, res, next) {
   
     // decode token
     if (token) {
-  
       // verifies secret and checks exp
-      var cert = fs.readFileSync('./ndi-asp-public.pem');
       jwt.verify(token, app.get('superSecret'), function(err, decoded) {      
         if (err) {
             jwt.verify(token, cert, function(err, decoded) {      
