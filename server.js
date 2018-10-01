@@ -109,6 +109,41 @@ app.post('/sign-in', function(req, res) {
         });  
 });
 
+app.post('/qr-code-ndi', function(req, res) {
+    let notifToken = rand.generate({ length: 16, charset: 'alphanumeric'});
+
+    let authRequest = {
+        client_id : config.ndi_client_id,
+        client_secret : config.ndi_client_secret,
+        scope: 'openid',
+        client_notification_token: notifToken,
+        acr_values: 'mod-mf',
+        login_hint: req.body.name,
+        binding_message: 'HelloNDI sends an auth request',
+        display:'qrcode',
+        redirect_uri : '',
+        nonce: uuidv1()
+    };
+
+    axios.post(config.ndi_asp_endpoint + '/di-auth', authRequest, axiosConfig)
+    .then(function (response) {
+        console.log(response.data);
+        // obtain request attributes for polling
+        authRequest.auth_req_id = response.data.auth_req_id;
+        authRequest.expires_in = response.data.expires_in;
+
+        res.json({ 
+            qr_code: response.data.qr_code, 
+            auth_req_id: response.data.auth_req_id
+        });
+    })
+    .catch(function (error) {
+        console.log(`ERROR occured during sign-in >>>`);
+        console.log(error);
+        res.json({success: false, message: 'Unable to authenticate with NDI', error: error.data});
+    });  
+});
+
 app.post('/sign-in-ndi', function(req, res) {
     let authStatusRequest = { 
         client_id : config.ndi_client_id, 
@@ -117,7 +152,7 @@ app.post('/sign-in-ndi', function(req, res) {
         grant_type: 'direct_invocation_request'
     };
 
-    // poller(url, data, interval, timeout, retries)
+    // poller(url, data, interval, timeout)
     poller(config.ndi_asp_endpoint + '/token', authStatusRequest, 1000, 15 * 1000)
         .then(function(status){  
             console.log("Polling ended");
@@ -170,42 +205,6 @@ function poller(url, data, interval, timeout) {
 // we'll get to these in a second
 // get an instance of the router for api routes
 var apiRoutes = express.Router(); 
-
-apiRoutes.post('/qr-code', function(req, res) {
-    let notifToken = rand.generate({ length: 16, charset: 'alphanumeric'});
-
-    let authRequest = {
-        client_id : config.ndi_client_id,
-        client_secret : config.ndi_client_secret,
-        scope: 'openid',
-        client_notification_token: notifToken,
-        acr_values: 'mod-mf',
-        login_hint: req.body.name,
-        binding_message: 'HelloNDI sends an auth request',
-        display:'qrcode',
-        redirect_uri : '',
-        nonce: uuidv1()
-    };
-
-    axios.post(config.ndi_asp_endpoint + '/di-auth', authRequest, axiosConfig)
-    .then(function (response) {
-        console.log(response.data);
-        // obtain request attributes for polling
-        authRequest.auth_req_id = response.data.auth_req_id;
-        authRequest.expires_in = response.data.expires_in;
-
-        res.json({ 
-            qr_code: response.data.qr_code, 
-            auth_req_id: response.data.auth_req_id
-        });
-    })
-    .catch(function (error) {
-        console.log(`ERROR occured during sign-in >>>`);
-        console.log(error);
-        res.json({success: false, message: 'Unable to authenticate with NDI', error: error.data});
-    });  
-});
-
 
 // route to authenticate a user (POST http://localhost:3000/api/authenticate)
 apiRoutes.post('/authenticate', function(req, res) {

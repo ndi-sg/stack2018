@@ -48,7 +48,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.min.js"></script>
   <script>
     $("#ndi-qr").on('click', function(){
-      $.post('/api/qr-code', function(data, status) {
+      $.post('/qr-code-ndi', function(data, status) {
         qr_code = data.qr_code;
         console.log(data);
         if ($('.card img').attr('src') == "/img/loading.svg"){
