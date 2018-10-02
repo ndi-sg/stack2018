@@ -8,7 +8,7 @@ Conceptual demo app for NDI workshop @STACK2018, developer conference by GovTech
 In the meantime, get your machine and test accounts ready on your mobile by going through the steps in https://ndi-sandbox.gitbook.io/ndi-stack2018/ 
 
 ### Install mobile app
-Please install/update the mobile app again, if you have create your test account before 1 Oct
+> Please install/update the mobile app again, if you have create your test account before 1 Oct
 
 For iOS: *once downloaded, do trust the certificate from “Government Technology Agency” in your [Profiles & Device Management] setting.* 
 
