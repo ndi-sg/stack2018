@@ -15,6 +15,11 @@ var bodyParser  = require('body-parser');
 var config      = require('./config'); // get our config file
 var app         = express();
 
+var fileUpload  = require('express-fileupload');
+ 
+// default options
+app.use(fileUpload());
+
 
 // =======================
 // in-memory db =========
@@ -91,6 +96,22 @@ app.get('/signapp', function(req, res) {
     res.sendFile(path + "signapp.html");
 });
 
+app.post('/upload', function(req, res) {
+    if (!req.files)
+      return res.status(400).send('No files were uploaded.');
+    console.log(req.files.files);
+    // The name of the input field (i.e. "sampleFile") is used to retrieve the uploaded file
+    let uploaded = req.files.files;
+   
+    // Use the mv() method to place the file somewhere on your server
+    uploaded.mv('/project/temp/'+uploaded.name, function(err) {
+      if (err)
+        return res.status(500).send(err);
+   
+      res.send('File uploaded!');
+    });
+});
+
 app.post('/sign-in', function(req, res) {
     let baseURL = 'http://localhost:' + port;
     axios.post(baseURL + '/api/authenticate', req.body)
@@ -115,44 +136,34 @@ app.post('/sign-in', function(req, res) {
 
 // route to NDI direct invocation flow to authenticate user
 app.post('/sign-with-ndi', function(req, res) {
+    let txid = rand.generate({ length: 16, charset: 'alphanumeric'});
     let signRequest = {
-        client_id: config.client_id,
-        client_secret: config.client_secret,
+        client_id: config.ndi_client_id,
+        client_secret: config.ndi_client_secret,
         hash_alg: 'sha256',
-        hash:'',
-        login_hint: req.body.name,
+        hash: req.body.hash,
+        login_hint: req.body.login_hint,
         scope: 'signHash',
         response_type: 'json',
-        tx_id: 'txid',
-        tx_state: '',
-        tx_expiry: '',
-        tx_vcode: '',
+        tx_id: 'txid_'+txid, 
+        tx_state: txid,
+    	tx_doc_name: req.body.tx_doc_name,
+        tx_vcode: req.body.tx_vcode,
         prompt: 'none', 
         nonce: uuidv1()
     };
+    
     axios.post(config.ndi_hss_endpoint+"/signatures/signHash", signRequest, axiosConfig)
       .then(function (response) {
         console.log(response.data);
         var cert = fs.readFileSync('./ndi-asp-public.pem');
-        jwt.verify(response.data.jws, cert, function(err, decoded) {      
-            if (err) {
-              return res.json({ success: false, message: 'Failed to authenticate ASP token.' });    
-            } else {
-              // if everything is good, save to request for use in other routes
-              req.decoded = decoded;
-              return res.json({ success: true, message: 'Authenticated by NDI successfully!',
-                response: response.data });    
-            }
-        });
-
         res.send(response.data);
       })
       .catch(function (error) {
         console.log(error);
         res.status(500).send({ 
             success: false, 
-            message: 'Server error.',
-            error: error
+            message: 'Server error.'
         });
       });
 });
